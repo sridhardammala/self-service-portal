@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>GCP Projects</h1>
+    <form action="/grant-access" method="post">
+        <!-- Project Dropdown -->
+        <label for="project">Select a Project:</label>
+        <select id="project" name="project">
+            <option value="mt-2dportal">mt-2dportal</option>
+            <option value="geodigital-397409">Geodigital</option>
+            <option value="datalake-426010">Datalake</option>
+            <option value="optelos">optelos</option>
+            <option value="point-cloud-mt">point-cloud-mt</option>
+            <option value="d-general-presales">3d-general-presales</option>
+        </select>
+        <br>
+
+        <!-- User Dropdown -->
+        <label for="user">Select a User:</label>
+        <select id="user" name="user">
+            <option value="sridhar@mindtrace.ai">Sridhar Dammala</option>
+            <option value="joshua@mindtrace.ai">Joshua Lister</option>
+            <option value="pankhuri@mindtrace.ai">Pankhuri Kulshrestha</option>
+            <option value="mazen.elabd@mindtrace.ai">Mazen  Elabd</option>
+            <option value="vineeth@mindtrace.ai">Vineeth Subramanyan</option>
+            <option value="Yasser.El.Haddar@mindtrace.ai">Yasser El Haddar</option>
+            <option value="yash.pedireddi@gmail.com">Yash Pedireddi</option>
+        </select>
+        <br>
+
+        <!-- Submit Button -->
+        <button type="submit">Grant Access</button>
+    </form>
+{% endblock %}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Service Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Self-Service Portal</h1>
+        <nav>
+            <ul class="menu">
+                <li><a href="/projects">GCP Projects</a></li>
+                <li><a href="/bucket-access">Bucket Access</a></li>
+                <li><a href="/create-bucket">Create Bucket</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+Jinja2
+python-multipart
+google-cloud-storage
+google-cloud-resource-manager
+google-auth
+google-auth-oauthlib
+google-api-core
