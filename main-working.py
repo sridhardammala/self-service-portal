@@ -42,26 +42,12 @@ def authenticate_user(username: str, password: str):
         return True
     return False
 
-
-
-# Update the login endpoint to redirect to home.html
+# Login endpoint
 @app.post("/login")
 async def login(username: str = Form(...), password: str = Form(...)):
     if authenticate_user(username, password):
-        return RedirectResponse(url="/home", status_code=303)  # Changed from "/projects" to "/home"
+        return RedirectResponse(url="/projects", status_code=303)
     raise HTTPException(status_code=401, detail="Invalid credentials")
-
-# Add this new route for the home page
-@app.get("/home", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request})
-
-# Update the root endpoint to redirect to home if authenticated (optional)
-@app.get("/")
-async def root(request: Request):
-    # You could add authentication check here if you want
-    # to automatically redirect logged-in users to home
-    return RedirectResponse(url="/login")
 
 # GCP Projects Page
 @app.get("/projects", response_class=HTMLResponse)

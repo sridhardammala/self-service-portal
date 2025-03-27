@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: self-service-portal-nodeport
+spec:
+  selector:
+    app: self-service-portal
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: self-service-portal-ingress
+  annotations:
+    # kubernetes.io/ingress.global-static-ip-name: adient-model-ip-us ##34.120.99.82 34.111.237.223
+    networking.gke.io/managed-certificates: self-service-portal-cert
+    ingressClassName: "gce"
+spec:
+  defaultBackend:
+    service:
+      name: self-service-portal-nodeport
+      port:
+        number: 80

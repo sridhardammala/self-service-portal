@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-service-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: self-service-portal
+  template:
+    metadata:
+      labels:
+        app: self-service-portal
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: cpu-pool
+      containers:
+      - name: self-service-portal
+        image: europe-west4-docker.pkg.dev/mt-2dportal/self-service-portal/self-service-portal-img:latest
+        imagePullPolicy: Always   
+        env:
+        - name: backend_service_url
+          # value: https://adient-demo.mlmodels.mindtrace.ai/pipeline
+          value: http://adient-model-nodeport/pipeline
+        ports:
+        - containerPort: 8000
+      
+      
+

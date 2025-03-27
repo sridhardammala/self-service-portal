@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto text-center">
+            <h1 class="mb-4">MindTrace GCP Self-Service Portal</h1>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <p class="lead">
+                        This portal provides self-service capabilities for managing access to GCP projects,
+                        creating storage buckets, and granting permissions to existing resources.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cloud"></i> Project Access</h5>
+                    <p class="card-text">
+                        Grant and manage access to GCP projects with predefined roles and permissions.
+                    </p>
+                    <a href="/projects" class="btn btn-primary">Manage Projects</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-hdd"></i> Bucket Access</h5>
+                    <p class="card-text">
+                        Control access to existing storage buckets and manage permissions.
+                    </p>
+                    <a href="/bucket-access" class="btn btn-primary">Manage Buckets</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-plus-circle"></i> Create Buckets</h5>
+                    <p class="card-text">
+                        Create new storage buckets with custom configurations and permissions.
+                    </p>
+                    <a href="/create-bucket" class="btn btn-primary">Create Bucket</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Getting Started</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="list-group list-group-numbered">
+                        <li class="list-group-item">Select the appropriate service from the menu</li>
+                        <li class="list-group-item">Choose the target resource (project or bucket)</li>
+                        <li class="list-group-item">Select the user and access level</li>
+                        <li class="list-group-item">Submit your request</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
