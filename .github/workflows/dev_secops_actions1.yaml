@@ -1,0 +1,91 @@
+---
+name: Build and Push Python Image to Google Cloud Platform 
+on:
+  push:
+    branches: [ main_main ]
+jobs:
+  build-push-gcr:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: fastapi-2dportal
+      PROJECT_ID: mt-2dportal
+      REPOSITORY_NAME: git-hub-artifcats
+      DOCKER_PKG_LOCATION: europe-west4-docker.pkg.dev
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # - id: 'auth'  
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0.4.0'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY_PROD}}' 
+        
+    # Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    # Install Bandit
+    - name: Install Bandit
+      run: |
+        python -m pip install --upgrade pip
+        # pip install bandit
+        bandit flake8 flake8-bugbear safety semgrep
+        pip install pre-commit
+
+    - name: Run pre-commit hooks
+      run: pre-commit run --all-files
+      
+    # Run Bandit security linter on the repository
+    - name: Run Bandit SAST
+      run: bandit -r . -o bandit_report.txt --severity-level high
+      continue-on-error: true
+        
+    # Upload Bandit report as artifact
+    - name: Upload Bandit Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: bandit-report
+        path: bandit_report.txt
+
+    # Optional: Display the Bandit report in GitHub Actions logs 
+    - name: Display Bandit report
+      run: cat bandit_report.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Configure Docker Client
+      run: |-
+        gcloud auth configure-docker --quiet
+        gcloud auth configure-docker $DOCKER_PKG_LOCATION --quiet
+        credential helper - run: | gcloud auth configure-docker -q
+        
+    - name: Build and Push Docker Image with Cache
+      run: |
+          docker buildx build --progress=plain\
+            --cache-from=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache \
+            --cache-to=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache,mode=max \
+            --push -t $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest .    
+  
+    # - name: Push Docker Image to Artifact Registry
+    #   run: |-
+    #     docker tag $IMAGE_NAME:latest $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
+    #     docker push $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
+    
+    # Get the GKE credentials so we can deploy to the cluster
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: gke-us-central-c
+        location: us-central1-c
+
+    # Deploy the Docker image to the GKE cluster
+    - name: Deploy
+      run: |-
+        kubectl rollout restart deployment fastapi-2dportal
+        kubectl get pods    
+                

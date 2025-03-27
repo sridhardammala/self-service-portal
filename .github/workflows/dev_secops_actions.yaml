@@ -1,0 +1,180 @@
+---
+name: Build and Push Python Image to Google Cloud Platform 
+on:
+  push:
+    branches: [ restore-working-version ]
+jobs:
+  build-push-gcr:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: fastapi-2dportal
+      PROJECT_ID: mt-2dportal
+      REPOSITORY_NAME: git-hub-artifcats
+      DOCKER_PKG_LOCATION: europe-west4-docker.pkg.dev
+      SONAR_TOKEN: sqa_fd27cd69f27c65fbac1eebcb3fa98029c65728c9
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # - id: 'auth'  
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0.4.0'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY_PROD}}' 
+        
+    # Set up Python environment
+    # - name: Set up Python
+    #   uses: actions/setup-python@v2
+    #   with:
+    #     python-version: '3.8'
+    #   # Step 2: Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    # # Step 3: Install dependencies
+    # - name: Install dependencies
+    #   run: |
+    #     python -m pip install --upgrade pip
+    #     pip install -r requirements.txt
+    #     pip install pytest pytest-cov coverage
+
+    # # Step 4: Run tests and generate coverage report
+    # - name: Run tests and generate coverage report
+    #   run: |
+    #     pytest --cov=. --cov-report=xml:coverage.xml ./tests    
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest pytest-cov coverage
+      # run: |
+      #   if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      #   pip install bandit flake8 flake8-bugbear safety semgrep pylint
+
+    - name: Run integration tests before  deployment
+      run:  |
+        PYTHONPATH=. pytest tests --cov=. --cov-report=xml:coverage.xml
+
+    # - name: Install dependencies
+    #   run: pip install -r requirements.txt
+    #   # run: |
+    #   #   if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    #   #   pip install bandit flake8 flake8-bugbear safety semgrep pylint
+
+    # - name: Run integration tests before  deployment
+    #   run:  |
+    #     PYTHONPATH=. pytest tests 
+
+    - uses: sonarsource/sonarqube-scan-action@v4      
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}    
+
+    - name: Fetch SonarQube Report (JSON)
+      run: |
+          curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+          "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=fastapi-github" \
+          | jq '.' > report.json
+
+    # - name: Upload SonarQube Report as Artifact
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: sonarqube-report
+    #     path: report.json    
+        
+    # # Step 4: Run Bandit (Security Linter)
+    # - name: Run Bandit
+    #   run: |
+    #     bandit -r . -o bandit_report.txt --severity-level high
+
+    # # Step 5: Run Flake8 (Code Style and Security Linter)
+    # - name: Run Flake8
+    #   run: |
+    #     flake8 . --max-line-length=120 --extend-ignore=E203,W503 --select=B --show-source --statistics --exclude=tests
+
+    # # Step 6: Run Safety (Dependency Vulnerability Scanner)
+    # # - name: Run Safety
+    # #   run: |
+    # #     safety scan --full-report
+
+    # # Step 7: Run Semgrep (Customizable Static Analysis)
+    # - name: Run Semgrep
+    #   run: |
+    #     semgrep --config=auto
+    #  # Step 4: Run Pylint on the Python codebase
+    # - name: Run Pylint
+    #   run: |
+    #     pylint --max-line-length=120 --disable=R,C --output-format=colorized --exit-zero .
+
+    # # Optional: Upload Pylint report (for easier review)
+    # - name: Upload Pylint report
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: pylint-report
+    #     path: pylint-report.txt    
+      
+    # # Upload Bandit report as artifact
+    # - name: Upload Bandit Report
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: bandit-report
+    #     path: bandit_report.txt
+
+    # # Optional: Display the Bandit report in GitHub Actions logs 
+    # - name: Display Bandit report
+    #   run: cat bandit_report.txt
+
+    # - name: Run SonarQube analysis
+    #   env:
+    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    #   run: |
+    #     sonar-scanner \
+    #       -Dsonar.projectKey=fastapi-github \
+    #       -Dsonar.host.url=$SONAR_HOST_URL \
+    #       -Dsonar.login=$SONAR_TOKEN  
+
+    # - uses: actions/checkout@v4
+    #     with:
+    #       fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Configure Docker Client
+      run: |-
+        gcloud auth configure-docker --quiet
+        gcloud auth configure-docker $DOCKER_PKG_LOCATION --quiet
+        credential helper - run: | gcloud auth configure-docker -q
+        
+    - name: Build and Push Docker Image with Cache
+      run: |
+          docker buildx build --progress=plain\
+            --cache-from=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache \
+            --cache-to=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache,mode=max \
+            --push -t $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest .    
+  
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: gke-us-central-c
+        location: us-central1-c
+
+    # Deploy the Docker image to the GKE cluster
+    - name: Deploy
+      run: |-
+        kubectl rollout restart deployment fastapi-2dportal
+        kubectl get pods    
+
+    - name: Install dependencies
+      run: pip install -r dev-requirements.txt
+
+    - name: Run integration tests after deployment
+      run: |
+        sleep 30 # Wait for the service to become available        
+        pytest -v tests/test_integration.py
+                

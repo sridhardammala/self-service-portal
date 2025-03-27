@@ -1,0 +1,100 @@
+---
+name: Build and Push Python Image to Google Cloud Platform 
+on:
+  push:
+    branches: [ main_main ]
+jobs:
+  build-push-gcr:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: fastapi-2dportal
+      PROJECT_ID: mt-2dportal
+      REPOSITORY_NAME: git-hub-artifcats
+      DOCKER_PKG_LOCATION: europe-west4-docker.pkg.dev
+      SONAR_TOKEN: sqa_fd27cd69f27c65fbac1eebcb3fa98029c65728c9
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # - id: 'auth'  
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0.4.0'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY_PROD}}' 
+        
+    # Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
+    - name: Configure Docker Client
+      run: |-
+        gcloud auth configure-docker --quiet
+        gcloud auth configure-docker $DOCKER_PKG_LOCATION --quiet
+        credential helper - xrun: | gcloud auth configure-docker -q
+        
+    - name: Build and Push Docker Image with Cache
+      run: |
+          docker buildx build --progress=plain\
+            --cache-from=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache \
+            --cache-to=type=registry,ref=$DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:cache,mode=max \
+            --push -t $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest .    
+
+    - name: Ensure image is pulled before inspect
+      run: |
+        # Pull the image to ensure it's locally available before inspecting
+        docker pull $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
+
+    - name: Get Image SHA Digest
+      run: |
+        IMAGE_SHA=$(docker inspect --format='{{index .RepoDigests 0}}' $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest)
+        echo "IMAGE_SHA=$IMAGE_SHA" >> $GITHUB_ENV
+        echo "IMAGE_SHA=$IMAGE_SHA"
+
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        repository: sridhardammala/argocd-fastapi
+        token: ${{ secrets.PAT }}
+
+    # Step 5: Update deployment.yaml in the argocd-fastapi repository
+    - name: Update deployment.yaml
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Current repository URL:"
+        git remote -v
+        echo "Top level directory of the repository:"
+        git rev-parse --show-toplevel
+        echo "Current Git branch:"
+        git status
+
+        echo "Listing files in current directory"
+        ls -l
+        # Ensure we're in the correct directory
+        cd dev || exit 1  # Navigate to the repo directory
+        
+        # Checkout the main branch
+        # git checkout main  # Ensure you're on the main branch
+        git checkout main || git checkout master  # Tries 'main', if not found, tries 'master'
+
+        # Get the image SHA value from the environment
+        IMAGE_SHA=${{ env.IMAGE_SHA }}
+
+        # Update the image in deployment.yaml with the new SHA digest
+        sed -i "s|image: europe-west4-docker.pkg.dev/mt-2dportal/git-hub-artifcats/fastapi-2dportal:.*|image: $IMAGE_SHA|" deployment.yaml
+
+        # Configure Git user for commit
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+
+        # Commit the change to deployment.yaml
+        git add deployment.yaml
+        git commit -m "Update image to $IMAGE_SHA"
+        git push origin master  # Push the changes to the main branch

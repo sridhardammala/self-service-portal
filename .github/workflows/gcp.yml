@@ -1,0 +1,51 @@
+---
+name: Build and Push Python Image to Google Cloud Platform
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build-push-gcr:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: self-service-portal-img
+      PROJECT_ID: mt-2dportal
+      REPOSITORY_NAME: self-service-portal
+      DOCKER_PKG_LOCATION: europe-west4-docker.pkg.dev 
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # - id: 'auth'  
+    - name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0.4.0'
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY_PROD}}' 
+    
+    - name: Build Docker Image
+      run: docker build -t $IMAGE_NAME:latest .
+   
+    - name: Configure Docker Client
+      run: |-
+        gcloud auth configure-docker --quiet
+        gcloud auth configure-docker $DOCKER_PKG_LOCATION --quiet
+        credential helper - run: | gcloud auth configure-docker -q
+  
+    - name: Push Docker Image to Artifact Registry
+      run: |-
+        docker tag $IMAGE_NAME:latest $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
+        docker push $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
+    
+    # # Get the GKE credentials so we can deploy to the cluster
+    # - name: Set up GKE credentials
+    #   uses: google-github-actions/get-gke-credentials@v2
+    #   with:
+    #     cluster_name: gke-us-central-c
+    #     location: us-central1-c
+
+    # # Deploy the Docker image to the GKE cluster
+    # - name: Deploy
+    #   run: |-
+    #     kubectl rollout restart deployment fastapi-2dportal
+    #     kubectl get pods    
+                
