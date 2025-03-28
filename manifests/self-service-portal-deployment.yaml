@@ -20,6 +20,19 @@ spec:
         imagePullPolicy: Always   
         ports:
         - containerPort: 8000
-      
-      
-
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 10   # Time to wait before the first probe
+          periodSeconds: 10         # How often to perform the probe
+          failureThreshold: 3       # Number of failures before marking the pod as unhealthy
+          successThreshold: 1       # Number of successes required before marking the pod as healthy
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 5    # Time to wait before the first readiness probe
+          periodSeconds: 5          # How often to perform the readiness probe
+          failureThreshold: 3       # Number of failures before marking the pod as not ready
+          successThreshold: 1       # Number of successes required before marking the pod as ready
