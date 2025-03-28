@@ -56,6 +56,12 @@ async def login(username: str = Form(...), password: str = Form(...)):
 async def home(request: Request):
     return templates.TemplateResponse("home.html", {"request": request})
 
+# Example Health Check Endpoint
+@app.get("/healthz")
+async def health_check():
+    # Here you can add more logic to check actual service health, e.g., database connectivity, etc.
+    return JSONResponse(status_code=200, content={"status": "healthy"})
+
 # Update the root endpoint to redirect to home if authenticated (optional)
 @app.get("/")
 async def root(request: Request):

@@ -4,5 +4,5 @@ metadata:
   name: self-service-portal-cert
 spec:
   domains:
-    - self-service.prod.mindtrace.ai
+    - self-service.staging.mindtrace.ai
     

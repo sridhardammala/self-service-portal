@@ -18,10 +18,6 @@ spec:
       - name: self-service-portal
         image: europe-west4-docker.pkg.dev/mt-2dportal/self-service-portal/self-service-portal-img:latest
         imagePullPolicy: Always   
-        env:
-        - name: backend_service_url
-          # value: https://adient-demo.mlmodels.mindtrace.ai/pipeline
-          value: http://adient-model-nodeport/pipeline
         ports:
         - containerPort: 8000
       
