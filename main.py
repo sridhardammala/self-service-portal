@@ -68,7 +68,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
             key="session_token",
             value=session_token,
             httponly=True,
-            secure=True,  # Enable in production with HTTPS
+            # secure=True,  # Enable in production with HTTPS
+            secure=False,  # Disable for testing HTTP
             samesite="lax"
         )
         return response
