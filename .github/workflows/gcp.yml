@@ -37,15 +37,15 @@ jobs:
         docker push $DOCKER_PKG_LOCATION/$PROJECT_ID/$REPOSITORY_NAME/$IMAGE_NAME:latest
     
     # # Get the GKE credentials so we can deploy to the cluster
-    # - name: Set up GKE credentials
-    #   uses: google-github-actions/get-gke-credentials@v2
-    #   with:
-    #     cluster_name: gke-us-central-c
-    #     location: us-central1-c
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: gke-us-central-c
+        location: us-central1-c
 
-    # # Deploy the Docker image to the GKE cluster
-    # - name: Deploy
-    #   run: |-
-    #     kubectl rollout restart deployment fastapi-2dportal
-    #     kubectl get pods    
+    # Deploy the Docker image to the GKE cluster
+    - name: Deploy
+      run: |-
+        kubectl rollout restart deployment self-service-portal
+        kubectl get pods    
                 

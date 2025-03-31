@@ -1,16 +1,18 @@
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
-from google.cloud import resourcemanager_v3
-from google.oauth2 import service_account
-import os
-from google.cloud import storage
+from google.cloud import resourcemanager_v3, storage
 from google.api_core.exceptions import Conflict, BadRequest
 from google.auth import default
+import secrets
+from typing import Dict, Optional
+import os
 
 app = FastAPI()
+
+# Session management
+active_sessions: Dict[str, str] = {}  # session_token: username
 
 # Mount static files for CSS
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -43,64 +45,97 @@ def authenticate_user(username: str, password: str):
         return True
     return False
 
+# Authentication dependency
+async def get_current_user(request: Request):
+    session_token = request.cookies.get("session_token")
+    if not session_token or session_token not in active_sessions:
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            detail="Not authenticated",
+            headers={"Location": "/login"}
+        )
+    return active_sessions[session_token]
 
-
-# Update the login endpoint to redirect to home.html
+# Update the login endpoint to create session
 @app.post("/login")
-async def login(username: str = Form(...), password: str = Form(...)):
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     if authenticate_user(username, password):
-        return RedirectResponse(url="/home", status_code=303)  # Changed from "/projects" to "/home"
+        session_token = secrets.token_hex(32)
+        active_sessions[session_token] = username
+        
+        response = RedirectResponse(url="/home", status_code=303)
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=True,  # Enable in production with HTTPS
+            samesite="lax"
+        )
+        return response
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
-# Add this new route for the home page
-@app.get("/home", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request})
+# Add logout endpoint
+@app.get("/logout")
+async def logout(request: Request):
+    session_token = request.cookies.get("session_token")
+    if session_token in active_sessions:
+        del active_sessions[session_token]
+    response = RedirectResponse(url="/login")
+    response.delete_cookie("session_token")
+    return response
 
-# Example Health Check Endpoint
+@app.post("/logout")  # Changed from @app.get to @app.post
+async def logout(request: Request):
+    session_token = request.cookies.get("session_token")
+    if session_token in active_sessions:
+        del active_sessions[session_token]
+    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie("session_token")
+    return response
+
+# Add this new route for the home page (now protected)
+@app.get("/home", response_class=HTMLResponse)
+async def home(request: Request, user: str = Depends(get_current_user)):
+    return templates.TemplateResponse("home.html", {"request": request, "user": user})
+
+# Example Health Check Endpoint (no auth needed)
 @app.get("/healthz")
 async def health_check():
-    # Here you can add more logic to check actual service health, e.g., database connectivity, etc.
     return JSONResponse(status_code=200, content={"status": "healthy"})
 
-# Update the root endpoint to redirect to home if authenticated (optional)
+# Update the root endpoint
 @app.get("/")
-async def root(request: Request):
-    # You could add authentication check here if you want
-    # to automatically redirect logged-in users to home
+async def root():
     return RedirectResponse(url="/login")
 
-# GCP Projects Page
+# GCP Projects Page (now protected)
 @app.get("/projects", response_class=HTMLResponse)
-async def projects(request: Request):
+async def projects(request: Request, user: str = Depends(get_current_user)):
     projects = get_gcp_projects()
-    return templates.TemplateResponse("projects.html", {"request": request, "projects": projects})
-# Grant Access to GCP Project
+    return templates.TemplateResponse(
+        "projects.html", 
+        {"request": request, "projects": projects, "user": user}
+    )
+
+# Grant Access to GCP Project (now protected)
 @app.post("/grant-access")
-async def grant_access(request: Request):
+async def grant_access(request: Request, user: str = Depends(get_current_user)):
     form_data = await request.form()
     form_dict = dict(form_data)
     
-    # Print received form data for debugging
     print(f"Received form data: {form_dict}")
     
     project = form_dict.get("project")
-    user = form_dict.get("user")
+    target_user = form_dict.get("user")
     
-    # Print project and user information
-    print(f"Granting access to project: {project} for user: {user}")
-    
-    if not project or not user:
+    if not project or not target_user:
         return {"error": "Missing required fields"}
     
-    # Initialize credentials using custom project
-    credentials, _ = default()  # Use ADC for credentials, ignore the default project
+    credentials, _ = default()
     print(f"Using credentials for project: {project}")
     
-    # Initialize the GCP Resource Manager Client
     client = resourcemanager_v3.ProjectsClient(credentials=credentials)
     
-    # Retrieve the current IAM policy for the project
     try:
         policy = client.get_iam_policy(request={"resource": f"projects/{project}"})
         print(f"Current IAM policy retrieved successfully.")
@@ -108,11 +143,9 @@ async def grant_access(request: Request):
         print(f"Failed to retrieve IAM policy: {e}")
         return {"error": "Failed to retrieve IAM policy"}
     
-    # Add the user to the IAM policy (with Viewer role)
-    policy.bindings.add(role="roles/viewer", members=[f"user:{user}"])
-    print(f"Added user {user} with 'roles/viewer' to the IAM policy.")
+    policy.bindings.add(role="roles/viewer", members=[f"user:{target_user}"])
+    print(f"Added user {target_user} with 'roles/viewer' to the IAM policy.")
     
-    # Set the updated IAM policy
     try:
         client.set_iam_policy(request={"resource": f"projects/{project}", "policy": policy})
         print(f"Successfully set IAM policy for project {project}.")
@@ -121,39 +154,36 @@ async def grant_access(request: Request):
         return {"error": "Failed to set IAM policy"}
     
     return RedirectResponse(url="/projects", status_code=303)
-# Bucket Access Page
-@app.get("/bucket-access", response_class=HTMLResponse)
-async def bucket_access(request: Request):
-    return templates.TemplateResponse("bucket-access.html", {"request": request})
 
-# Grant Storage Admin Access to a GCP Bucket
+# Bucket Access Page (now protected)
+@app.get("/bucket-access", response_class=HTMLResponse)
+async def bucket_access(request: Request, user: str = Depends(get_current_user)):
+    return templates.TemplateResponse(
+        "bucket-access.html", 
+        {"request": request, "user": user}
+    )
+
+# Grant Storage Admin Access to a GCP Bucket (now protected)
 @app.post("/request-bucket-access")
-async def grant_storage_admin_access(request: Request):
+async def grant_storage_admin_access(request: Request, user: str = Depends(get_current_user)):
     form_data = await request.form()
     form_dict = dict(form_data)
     
-    # Print received form data for debugging
     print(f"Received form data: {form_dict}")
     
     project = form_dict.get("project")
     bucket_name = form_dict.get("bucket_name")
-    user = form_dict.get("user")
+    target_user = form_dict.get("user")
     
-    # Print project, bucket, and user information
-    print(f"Granting 'Storage Admin' access to bucket: {bucket_name} in project: {project} for user: {user}")
-    
-    if not project or not bucket_name or not user:
+    if not project or not bucket_name or not target_user:
         return {"error": "Missing required fields (project, bucket name, user)"}
     
-    # Initialize credentials using custom project
-    credentials, _ = default()  # Use ADC for credentials, ignore the default project
+    credentials, _ = default()
     print(f"Using credentials for project: {project}")
     
-    # Initialize the GCP Storage Client
     storage_client = storage.Client(credentials=credentials, project=project)
     
     try:
-        # Retrieve the IAM policy for the specified bucket
         bucket = storage_client.get_bucket(bucket_name)
         policy = bucket.get_iam_policy()
         print(f"Retrieved IAM policy for bucket: {bucket_name}")
@@ -161,15 +191,13 @@ async def grant_storage_admin_access(request: Request):
         print(f"Failed to retrieve IAM policy for bucket {bucket_name}: {e}")
         return {"error": f"Failed to retrieve IAM policy for bucket {bucket_name}"}
     
-    # Add the user to the IAM policy with "Storage Admin" role
     policy.bindings.append({
-        "role": "roles/storage.admin",  # "Storage Admin" role
-        "members": [f"user:{user}"]
+        "role": "roles/storage.admin",
+        "members": [f"user:{target_user}"]
     })
-    print(f"Added user {user} with 'roles/storage.admin' to the IAM policy for bucket {bucket_name}.")
+    print(f"Added user {target_user} with 'roles/storage.admin' to the IAM policy.")
     
     try:
-        # Set the updated IAM policy for the bucket
         bucket.set_iam_policy(policy)
         print(f"Successfully set IAM policy for bucket {bucket_name}.")
     except Exception as e:
@@ -178,55 +206,48 @@ async def grant_storage_admin_access(request: Request):
     
     return RedirectResponse(url="/bucket-access", status_code=303)
 
-# Create Bucket Page
+# Create Bucket Page (now protected)
 @app.get("/create-bucket", response_class=HTMLResponse)
-async def create_bucket(request: Request):
-    return templates.TemplateResponse("create-bucket.html", {"request": request})
+async def create_bucket_page(request: Request, user: str = Depends(get_current_user)):
+    return templates.TemplateResponse(
+        "create-bucket.html", 
+        {"request": request, "user": user}
+    )
 
+# Create Bucket endpoint (now protected)
 @app.post("/create-bucket")
-async def create_bucket(request: Request):
-    # Get all form data as a dictionary
+async def create_bucket(request: Request, user: str = Depends(get_current_user)):
     form_data = await request.form()
     form_dict = dict(form_data)
 
-    # Print all received form data
     print("\nReceived bucket creation request:")
     for key, value in form_dict.items():
         print(f"  {key}: {value}")
 
-    # Access and validate all required fields
     new_bucket_name = form_dict.get("new_bucket_name")
     project = form_dict.get("project")
     region = form_dict.get("region")
-    user = form_dict.get("user")
+    target_user = form_dict.get("user")
 
-    if not all([new_bucket_name, project, region, user]):
+    if not all([new_bucket_name, project, region, target_user]):
         print("Error: Missing required fields.")
         return {"error": "All fields (bucket name, project, region, user) are required"}
 
-    # Initialize storage client
-    # credentials, project = default()
-    credentials, _ = default()  # Ignore the default project
-
-    storage_client = storage.Client(credentials=credentials, project=project)
+    credentials, _ = default()
     print(f"Authenticated with project: {project}")
 
-    # Create bucket object
+    storage_client = storage.Client(credentials=credentials, project=project)
     bucket = storage_client.bucket(new_bucket_name)
     print(f"Bucket object created: {bucket}")
 
-    # Set bucket location
-    bucket.location = region  # No need to convert to uppercase
-
-    # Create the bucket in GCP
+    bucket.location = region
     created_bucket = storage_client.create_bucket(bucket)
     print(f"\nSuccessfully created bucket: {created_bucket.name}")
 
-    # Set bucket IAM policy for the user
     policy = created_bucket.get_iam_policy()
     policy.bindings.append({
         "role": "roles/storage.admin",
-        "members": [f"user:{user}"]
+        "members": [f"user:{target_user}"]
     })
     created_bucket.set_iam_policy(policy)
     print("IAM policy updated successfully.")
@@ -236,12 +257,7 @@ async def create_bucket(request: Request):
         status_code=303
     )
 
-# Root redirect to login
-@app.get("/")
-async def root():
-    return RedirectResponse(url="/login")
-
-# Login Page
+# Login Page (no auth needed)
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
