@@ -2,54 +2,186 @@
 
 {% block content %}
     <h1>Create Bucket</h1>
-    <form action="/create-bucket" method="post">
-        <label for="new-bucket-name">Bucket Name:</label>
-        <input type="text" id="new-bucket-name" name="new_bucket_name" required>
-        <br>
-        <label for="project">Select a Project:</label>
-        <select id="project" name="project" onchange="fetchBuckets()">
-            <option value="">-- Select a Project --</option>
-            {% for project in projects %}
-                <option value="{{ project }}">{{ project }}</option>
-            {% endfor %}
-        </select>
-        <br>
+    
+    <!-- Notification Messages -->
+    {% if request.query_params.get('success') %}
+    <div id="notification" class="notification success">
+        <span>{{ request.query_params.get('success') }}</span>
+        <button onclick="this.parentElement.style.display='none'">&times;</button>
+    </div>
+    {% endif %}
+    
+    {% if request.query_params.get('error') %}
+    <div id="notification" class="notification error">
+        <span>{{ request.query_params.get('error') }}</span>
+        <button onclick="this.parentElement.style.display='none'">&times;</button>
+    </div>
+    {% endif %}
+
+    <form action="/create-bucket" method="post" class="bucket-form">
+        <div class="form-group">
+            <label for="new-bucket-name">Bucket Name:</label>
+            <input 
+                type="text" 
+                id="new-bucket-name" 
+                name="new_bucket_name" 
+                required
+                pattern="[a-z0-9-]+"
+                title="Lowercase letters, numbers, and hyphens only"
+                value="{{ request.query_params.get('new_bucket_name', '') }}"
+            >
+            <small class="hint">3-63 characters, lowercase letters, numbers, and hyphens only</small>
+        </div>
         
-        <label for="Region">Select a Region:</label>
-        <select id="region" name="region">
-            <option value="europe-west2">europe-west2</option>
-            <option value="europe-west4">europe-west4</option>
-            <option value="us-east1">us-east1</option>
-            <option value="us-central1">us-central1</option>
-            <option value="us-west1">us-west1</option>    
-            <option value="us-west2">us-west2</option>           
-        </select>
-        <br>
+        <div class="form-group">
+            <label for="project">Select a Project:</label>
+            <select id="project" name="project" required>
+                <option value="">-- Select a Project --</option>
+                {% for project in projects %}
+                    <option 
+                        value="{{ project }}"
+                        {% if request.query_params.get('project') == project %}selected{% endif %}
+                    >
+                        {{ project }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="region">Select a Region:</label>
+            <select id="region" name="region" required>
+                <option value="">-- Select a Region --</option>
+                <option value="europe-west2" {% if request.query_params.get('region') == 'europe-west2' %}selected{% endif %}>europe-west2 (London)</option>
+                <option value="europe-west4" {% if request.query_params.get('region') == 'europe-west4' %}selected{% endif %}>europe-west4 (Netherlands)</option>
+                <option value="us-east1" {% if request.query_params.get('region') == 'us-east1' %}selected{% endif %}>us-east1 (South Carolina)</option>
+                <option value="us-central1" {% if request.query_params.get('region') == 'us-central1' %}selected{% endif %}>us-central1 (Iowa)</option>
+                <option value="us-west1" {% if request.query_params.get('region') == 'us-west1' %}selected{% endif %}>us-west1 (Oregon)</option>
+                <option value="us-west2" {% if request.query_params.get('region') == 'us-west2' %}selected{% endif %}>us-west2 (Los Angeles)</option>
+            </select>
+        </div>
 
-        <!-- User Dropdown -->
-        <label for="user">Select a User:</label>
-        <select id="user" name="user">
-            <option value="amalia@mindtrace.ai">Amalia Kassay</option>
-            <option value="andrii.zelenko@mindtrace.ai">Andrii Zelenko</option>
-            <option value="Angeliki.Mylona@mindtrace.ai">Angeliki Mylona</option>
-            <option value="can.elbirlik@mindtrace.ai">Can Elbirlik</option>
-            <option value="Chance.McKimmy@mindtrace.ai">Chance McKimmy</option>
-            <option value="christopher.fish@mindtrace.ai">Christopher Fish</option>
-            <option value="jeremy@mindtrace.ai">Jeremy Wurbs</option>
-            <option value="joshua@mindtrace.ai">Joshua Lister</option>
-            <option value="Martha.Mitsopoulou@mindtrace.ai">Martha Mitsopoulou</option>
-            <option value="mayank@mindtrace.ai">Mayank  Sharma</option>
-            <option value="mazen.elabd@mindtrace.ai">Mazen Elabd</option>
-            <option value="nan.wang@mindtrace.ai">Nan Wang</option>
-            <option value="pankhuri@mindtrace.ai">Pankhuri Kulshrestha</option>
-            <option value="santhosh@mindtrace.ai">Santhosh Holla</option>
-            <option value="sridhar@mindtrace.ai">Sridhar Dammala</option>
-            <option value="vineeth@mindtrace.ai">Vineeth Subramanyan</option>
-            <option value="yash@mindtrace.ai">Yashasvi Pedireddi</option>
-            <option value="Yasser.El.Haddar@mindtrace.ai">Yasser El Haddar</option>
-        </select>
-        <br>
+        <div class="form-group">
+            <label for="user">Select a User:</label>
+            <select id="user" name="user" required>
+                <option value="">-- Select a User --</option>
+                <option value="amalia@mindtrace.ai" {% if request.query_params.get('user') == 'amalia@mindtrace.ai' %}selected{% endif %}>Amalia Kassay</option>
+                <option value="andrii.zelenko@mindtrace.ai" {% if request.query_params.get('user') == 'andrii.zelenko@mindtrace.ai' %}selected{% endif %}>Andrii Zelenko</option>
+                <option value="Angeliki.Mylona@mindtrace.ai" {% if request.query_params.get('user') == 'Angeliki.Mylona@mindtrace.ai' %}selected{% endif %}>Angeliki Mylona</option>
+                <option value="can.elbirlik@mindtrace.ai" {% if request.query_params.get('user') == 'can.elbirlik@mindtrace.ai' %}selected{% endif %}>Can Elbirlik</option>
+                <option value="Chance.McKimmy@mindtrace.ai" {% if request.query_params.get('user') == 'Chance.McKimmy@mindtrace.ai' %}selected{% endif %}>Chance McKimmy</option>
+                <option value="christopher.fish@mindtrace.ai" {% if request.query_params.get('user') == 'christopher.fish@mindtrace.ai' %}selected{% endif %}>Christopher Fish</option>
+                <option value="jeremy@mindtrace.ai" {% if request.query_params.get('user') == 'jeremy@mindtrace.ai' %}selected{% endif %}>Jeremy Wurbs</option>
+                <option value="joshua@mindtrace.ai" {% if request.query_params.get('user') == 'joshua@mindtrace.ai' %}selected{% endif %}>Joshua Lister</option>
+                <option value="Martha.Mitsopoulou@mindtrace.ai" {% if request.query_params.get('user') == 'Martha.Mitsopoulou@mindtrace.ai' %}selected{% endif %}>Martha Mitsopoulou</option>
+                <option value="mayank@mindtrace.ai" {% if request.query_params.get('user') == 'mayank@mindtrace.ai' %}selected{% endif %}>Mayank Sharma</option>
+                <option value="mazen.elabd@mindtrace.ai" {% if request.query_params.get('user') == 'mazen.elabd@mindtrace.ai' %}selected{% endif %}>Mazen Elabd</option>
+                <option value="nan.wang@mindtrace.ai" {% if request.query_params.get('user') == 'nan.wang@mindtrace.ai' %}selected{% endif %}>Nan Wang</option>
+                <option value="pankhuri@mindtrace.ai" {% if request.query_params.get('user') == 'pankhuri@mindtrace.ai' %}selected{% endif %}>Pankhuri Kulshrestha</option>
+                <option value="santhosh@mindtrace.ai" {% if request.query_params.get('user') == 'santhosh@mindtrace.ai' %}selected{% endif %}>Santhosh Holla</option>
+                <option value="sridhar@mindtrace.ai" {% if request.query_params.get('user') == 'sridhar@mindtrace.ai' %}selected{% endif %}>Sridhar Dammala</option>
+                <option value="vineeth@mindtrace.ai" {% if request.query_params.get('user') == 'vineeth@mindtrace.ai' %}selected{% endif %}>Vineeth Subramanyan</option>
+                <option value="yash@mindtrace.ai" {% if request.query_params.get('user') == 'yash@mindtrace.ai' %}selected{% endif %}>Yashasvi Pedireddi</option>
+                <option value="Yasser.El.Haddar@mindtrace.ai" {% if request.query_params.get('user') == 'Yasser.El.Haddar@mindtrace.ai' %}selected{% endif %}>Yasser El Haddar</option>
+            </select>
+        </div>
 
-        <button type="submit">Create Bucket</button>
+        <button type="submit" class="submit-btn">Create Bucket</button>
     </form>
+
+    <style>
+        .bucket-form {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .hint {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.8em;
+        }
+        
+        .submit-btn {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            background-color: #3367d6;
+        }
+        
+        .notification {
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+        
+        .success {
+            background-color: #e6f4ea;
+            color: #137333;
+            border-left: 4px solid #34a853;
+        }
+        
+        .error {
+            background-color: #fce8e6;
+            color: #c5221f;
+            border-left: 4px solid #d93025;
+        }
+        
+        .notification button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: inherit;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+    <script>
+        // Auto-focus on bucket name field if there's an error
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.location.search.includes('error')) {
+                document.getElementById('new-bucket-name').focus();
+            }
+        });
+    </script>
 {% endblock %}

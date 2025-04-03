@@ -308,33 +308,49 @@ async def create_bucket(request: Request, user: str = Depends(get_current_user))
     target_user = form_dict.get("user")
 
     if not all([new_bucket_name, project, region, target_user]):
-        print("Error: Missing required fields.")
-        return {"error": "All fields (bucket name, project, region, user) are required"}
+        return RedirectResponse(
+            url="/create-bucket?error=All+fields+are+required",
+            status_code=303
+        )
 
-    credentials, _ = default()
-    print(f"Authenticated with project: {project}")
+    try:
+        credentials, _ = default()
+        storage_client = storage.Client(credentials=credentials, project=project)
+        
+        # Check if bucket exists first
+        if storage_client.lookup_bucket(new_bucket_name):
+            return RedirectResponse(
+                url=f"/create-bucket?error=Bucket+{new_bucket_name}+already+exists",
+                status_code=303
+            )
+            
+        bucket = storage_client.bucket(new_bucket_name)
+        bucket.location = region
+        created_bucket = storage_client.create_bucket(bucket)
 
-    storage_client = storage.Client(credentials=credentials, project=project)
-    bucket = storage_client.bucket(new_bucket_name)
-    print(f"Bucket object created: {bucket}")
+        policy = created_bucket.get_iam_policy()
+        policy.bindings.append({
+            "role": "roles/storage.admin",
+            "members": [f"user:{target_user}"]
+        })
+        created_bucket.set_iam_policy(policy)
 
-    bucket.location = region
-    created_bucket = storage_client.create_bucket(bucket)
-    print(f"\nSuccessfully created bucket: {created_bucket.name}")
+        return RedirectResponse(
+            url=f"/create-bucket?success=Bucket+{new_bucket_name}+created",
+            status_code=303
+        )
 
-    policy = created_bucket.get_iam_policy()
-    policy.bindings.append({
-        "role": "roles/storage.admin",
-        "members": [f"user:{target_user}"]
-    })
-    created_bucket.set_iam_policy(policy)
-    print("IAM policy updated successfully.")
-
-    return RedirectResponse(
-        url=f"/create-bucket?success=Bucket+{new_bucket_name}+created",
-        status_code=303
-    )
-
+    except Conflict:
+        return RedirectResponse(
+            url=f"/create-bucket?error=Bucket+{new_bucket_name}+already+exists",
+            status_code=303
+        )
+    except Exception as e:
+        print(f"Error creating bucket: {str(e)}")
+        return RedirectResponse(
+            url=f"/create-bucket?error=Failed+to+create+bucket:+{str(e)}",
+            status_code=303
+        )
 # Login Page (no auth needed)
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
