@@ -282,9 +282,14 @@ async def grant_storage_admin_access(request: Request, user: str = Depends(get_c
 # Create Bucket Page (now protected)
 @app.get("/create-bucket", response_class=HTMLResponse)
 async def create_bucket_page(request: Request, user: str = Depends(get_current_user)):
+    # return templates.TemplateResponse(
+    #     "create-bucket.html", 
+    #     {"request": request, "user": user}
+    # )
+    projects = get_gcp_projects()
     return templates.TemplateResponse(
         "create-bucket.html", 
-        {"request": request, "user": user}
+        {"request": request, "projects": projects, "user": user, "buckets": []}
     )
 
 # Create Bucket endpoint (now protected)

@@ -7,15 +7,14 @@
         <input type="text" id="new-bucket-name" name="new_bucket_name" required>
         <br>
         <label for="project">Select a Project:</label>
-        <select id="project" name="project">
-            <option value="mt-2dportal">mt-2dportal</option>
-            <option value="geodigital-397409">Geodigital</option>
-            <option value="datalake-426010">Datalake</option>
-            <option value="optelos">optelos</option>
-            <option value="point-cloud-mt">point-cloud-mt</option>
-            <option value="d-general-presales">3d-general-presales</option>
+        <select id="project" name="project" onchange="fetchBuckets()">
+            <option value="">-- Select a Project --</option>
+            {% for project in projects %}
+                <option value="{{ project }}">{{ project }}</option>
+            {% endfor %}
         </select>
         <br>
+        
         <label for="Region">Select a Region:</label>
         <select id="region" name="region">
             <option value="europe-west2">europe-west2</option>
