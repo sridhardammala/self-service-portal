@@ -6,12 +6,9 @@
         <!-- Project Dropdown -->
         <label for="project">Select a Project:</label>
         <select id="project" name="project">
-            <option value="mt-2dportal">mt-2dportal</option>
-            <option value="geodigital-397409">Geodigital</option>
-            <option value="datalake-426010">Datalake</option>
-            <option value="optelos">optelos</option>
-            <option value="point-cloud-mt">point-cloud-mt</option>
-            <option value="d-general-presales">3d-general-presales</option>
+            {% for project in projects %}
+                <option value="{{ project }}">{{ project }}</option>
+            {% endfor %}
         </select>
         <br>
 

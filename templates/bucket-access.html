@@ -2,56 +2,111 @@
 
 {% block content %}
     <h1>Bucket Access</h1>
-    <form action="/request-bucket-access" method="post"> 
-        <label for="bucket-name">Bucket Name:</label>
-        <input type="text" id="bucket-name" name="bucket_name" required>
-        <br>
+    <form action="/request-bucket-access" method="post">
         <label for="project">Select a Project:</label>
-        <select id="project" name="project">
-            <option value="mt-2dportal">mt-2dportal</option>
-            <option value="geodigital-397409">Geodigital</option>
-            <option value="datalake-426010">Datalake</option>
-            <option value="optelos">optelos</option>
-            <option value="point-cloud-mt">point-cloud-mt</option>
-            <option value="d-general-presales">3d-general-presales</option>
+        <select id="project" name="project" onchange="fetchBuckets()">
+            <option value="">-- Select a Project --</option>
+            {% for project in projects %}
+                <option value="{{ project }}">{{ project }}</option>
+            {% endfor %}
         </select>
         <br>
-        <!-- <label for="Region">Select a Region:</label>
-        <select id="region" name="region">
-            <option value="europe-west2">europe-west2</option>
-            <option value="europe-west4">europe-west4</option>
-            <option value="us-east1">us-east1</option>
-            <option value="us-central1">us-central1</option>
-            <option value="us-west1">us-west1</option>    
-            <option value="us-west2">us-west2</option>           
+        
+        <label for="bucket-name">Select a Bucket:</label>
+        <select id="bucket-name" name="bucket_name" required disabled>
+            <option value="">-- Select a Bucket --</option>
         </select>
-        <br> -->
+        <br>
 
-        <!-- User Dropdown -->
         <label for="user">Select a User:</label>
         <select id="user" name="user">
             <option value="amalia@mindtrace.ai">Amalia Kassay</option>
-            <option value="andrii.zelenko@mindtrace.ai">Andrii Zelenko</option>
-            <option value="Angeliki.Mylona@mindtrace.ai">Angeliki Mylona</option>
-            <option value="can.elbirlik@mindtrace.ai">Can Elbirlik</option>
-            <option value="Chance.McKimmy@mindtrace.ai">Chance McKimmy</option>
-            <option value="christopher.fish@mindtrace.ai">Christopher Fish</option>
-            <option value="jeremy@mindtrace.ai">Jeremy Wurbs</option>
-            <option value="joshua@mindtrace.ai">Joshua Lister</option>
-            <option value="Martha.Mitsopoulou@mindtrace.ai">Martha Mitsopoulou</option>
-            <option value="mayank@mindtrace.ai">Mayank  Sharma</option>
-            <option value="mazen.elabd@mindtrace.ai">Mazen Elabd</option>
-            <option value="nan.wang@mindtrace.ai">Nan Wang</option>
-            <option value="pankhuri@mindtrace.ai">Pankhuri Kulshrestha</option>
-            <option value="santhosh@mindtrace.ai">Santhosh Holla</option>
-            <option value="sridhar@mindtrace.ai">Sridhar Dammala</option>
-            <option value="vineeth@mindtrace.ai">Vineeth Subramanyan</option>
-            <option value="yash@mindtrace.ai">Yashasvi Pedireddi</option>
-            <option value="Yasser.El.Haddar@mindtrace.ai">Yasser El Haddar</option>
-
+            <!-- Keep all your existing user options -->
+            <!-- ... -->
         </select>
         <br>
 
         <button type="submit">Request Admin Access</button>
     </form>
+
+    <!-- Toast Notification (hidden by default) -->
+    <div id="toast" style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: none;
+        z-index: 1000;
+        animation: fadeIn 0.3s;
+    "></div>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+    <script>
+        // Check for success flag when page loads
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('success')) {
+                showToast('Access granted successfully!');
+                // Clean the URL
+                history.replaceState(null, '', window.location.pathname);
+            }
+        };
+
+        // Toast controller
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Your existing bucket-fetching function
+        async function fetchBuckets() {
+            const projectSelect = document.getElementById('project');
+            const bucketSelect = document.getElementById('bucket-name');
+            const projectId = projectSelect.value;
+            
+            if (!projectId) {
+                bucketSelect.innerHTML = '<option value="">-- Select a Bucket --</option>';
+                bucketSelect.disabled = true;
+                return;
+            }
+            
+            try {
+                bucketSelect.disabled = true;
+                bucketSelect.innerHTML = '<option value="">Loading buckets...</option>';
+                
+                const response = await fetch(`/get-buckets/${projectId}`);
+                const data = await response.json();
+                
+                if (data.error) throw new Error(data.error);
+                
+                bucketSelect.innerHTML = '<option value="">-- Select a Bucket --</option>';
+                data.buckets.forEach(bucket => {
+                    const option = document.createElement('option');
+                    option.value = bucket;
+                    option.textContent = bucket;
+                    bucketSelect.appendChild(option);
+                });
+                
+                bucketSelect.disabled = false;
+            } catch (error) {
+                console.error('Error fetching buckets:', error);
+                bucketSelect.innerHTML = `<option value="">Error: ${error.message}</option>`;
+            }
+        }
+    </script>
 {% endblock %}

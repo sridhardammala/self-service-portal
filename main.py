@@ -113,6 +113,7 @@ async def root():
 @app.get("/projects", response_class=HTMLResponse)
 async def projects(request: Request, user: str = Depends(get_current_user)):
     projects = get_gcp_projects()
+    print(f'GCP Proejcts are: {projects}')
     return templates.TemplateResponse(
         "projects.html", 
         {"request": request, "projects": projects, "user": user}
@@ -156,14 +157,31 @@ async def grant_access(request: Request, user: str = Depends(get_current_user)):
     
     return RedirectResponse(url="/projects", status_code=303)
 
+def get_gcp_buckets(project_id):
+    credentials, _ = default()
+    storage_client = storage.Client(credentials=credentials, project=project_id)
+    buckets = list(storage_client.list_buckets())
+    return [bucket.name for bucket in buckets]
+
 # Bucket Access Page (now protected)
 @app.get("/bucket-access", response_class=HTMLResponse)
 async def bucket_access(request: Request, user: str = Depends(get_current_user)):
+    projects = get_gcp_projects()
     return templates.TemplateResponse(
         "bucket-access.html", 
-        {"request": request, "user": user}
+        {"request": request, "projects": projects, "user": user, "buckets": []}
     )
 
+# New endpoint to fetch buckets for a project
+@app.get("/get-buckets/{project_id}")
+async def get_buckets(project_id: str, user: str = Depends(get_current_user)):
+    try:
+        buckets = get_gcp_buckets(project_id)
+        return {"buckets": buckets}
+    except Exception as e:
+        return {"error": str(e)}
+
+# Grant Storage Admin Access to a GCP Bucket (now protected)
 # Grant Storage Admin Access to a GCP Bucket (now protected)
 @app.post("/request-bucket-access")
 async def grant_storage_admin_access(request: Request, user: str = Depends(get_current_user)):
@@ -180,7 +198,6 @@ async def grant_storage_admin_access(request: Request, user: str = Depends(get_c
         return {"error": "Missing required fields (project, bucket name, user)"}
     
     credentials, _ = default()
-    print(f"Using credentials for project: {project}")
     
     storage_client = storage.Client(credentials=credentials, project=project)
     
@@ -201,11 +218,66 @@ async def grant_storage_admin_access(request: Request, user: str = Depends(get_c
     try:
         bucket.set_iam_policy(policy)
         print(f"Successfully set IAM policy for bucket {bucket_name}.")
+        # Add success parameter here when everything works
+        return RedirectResponse(url="/bucket-access?success=true", status_code=303)
     except Exception as e:
         print(f"Failed to set IAM policy for bucket {bucket_name}: {e}")
         return {"error": f"Failed to set IAM policy for bucket {bucket_name}"}
     
-    return RedirectResponse(url="/bucket-access", status_code=303)
+    # Remove this line as it's unreachable after the try/except blocks
+    # return RedirectResponse(url="/bucket-access", status_code=303)
+# Bucket Access Page (now protected)
+# @app.get("/bucket-access", response_class=HTMLResponse)
+# async def bucket_access(request: Request, user: str = Depends(get_current_user)):
+#     projects = get_gcp_projects()
+#     print(f'GCP Proejcts are: {projects}')
+#     return templates.TemplateResponse(
+#         "bucket-access.html", 
+#         {"request": request, "projects": projects, "user": user}    
+#     )
+
+# # Grant Storage Admin Access to a GCP Bucket (now protected)
+# @app.post("/request-bucket-access")
+# async def grant_storage_admin_access(request: Request, user: str = Depends(get_current_user)):
+#     form_data = await request.form()
+#     form_dict = dict(form_data)
+    
+#     print(f"Received form data: {form_dict}")
+    
+#     project = form_dict.get("project")
+#     bucket_name = form_dict.get("bucket_name")
+#     target_user = form_dict.get("user")
+    
+#     if not project or not bucket_name or not target_user:
+#         return {"error": "Missing required fields (project, bucket name, user)"}
+    
+#     credentials, _ = default()
+#     print(f"Using credentials for project: {project}")
+    
+#     storage_client = storage.Client(credentials=credentials, project=project)
+    
+#     try:
+#         bucket = storage_client.get_bucket(bucket_name)
+#         policy = bucket.get_iam_policy()
+#         print(f"Retrieved IAM policy for bucket: {bucket_name}")
+#     except Exception as e:
+#         print(f"Failed to retrieve IAM policy for bucket {bucket_name}: {e}")
+#         return {"error": f"Failed to retrieve IAM policy for bucket {bucket_name}"}
+    
+#     policy.bindings.append({
+#         "role": "roles/storage.admin",
+#         "members": [f"user:{target_user}"]
+#     })
+#     print(f"Added user {target_user} with 'roles/storage.admin' to the IAM policy.")
+    
+#     try:
+#         bucket.set_iam_policy(policy)
+#         print(f"Successfully set IAM policy for bucket {bucket_name}.")
+#     except Exception as e:
+#         print(f"Failed to set IAM policy for bucket {bucket_name}: {e}")
+#         return {"error": f"Failed to set IAM policy for bucket {bucket_name}"}
+    
+#     return RedirectResponse(url="/bucket-access", status_code=303)
 
 # Create Bucket Page (now protected)
 @app.get("/create-bucket", response_class=HTMLResponse)
